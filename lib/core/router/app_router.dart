@@ -11,7 +11,9 @@ import '../../presentation/clinical_actions/novo_pedido_exame_screen.dart';
 import '../../presentation/clinical_actions/relatorio_pdf_screen.dart';
 import '../../presentation/tools/vincular_paciente_screen.dart';
 import '../../presentation/tools/teleconsulta_screen.dart';
+import '../../presentation/tools/calculadoras_screen.dart';
 import '../../presentation/clinical_actions/enviar_mensagem_paciente_screen.dart';
+
 
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -91,9 +93,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               return EnviarMensagemPacienteScreen(pacienteId: id);
             },
           ),
+          GoRoute(
+            path: 'calculadoras',
+            builder: (context, state) {
+              final id = state.pathParameters['id']!;
+              return CalculadorasScreen(pacienteId: id);
+            },
+          ),
         ],
+      ),
+      GoRoute(
+        path: '/calculadoras',
+        builder: (context, state) => const CalculadorasScreen(),
       ),
     ],
   );
-
 });
+

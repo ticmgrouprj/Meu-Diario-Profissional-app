@@ -65,12 +65,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Calculadoras Médicas no Bolso',
+            icon: const Icon(Icons.calculate_outlined, color: AppColors.primary),
+            onPressed: () => context.push('/calculadoras'),
+          ),
+          IconButton(
             tooltip: 'Vincular Paciente / Scanner QR',
             icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primary),
             onPressed: () => context.push('/vincular-paciente'),
           ),
           const SizedBox(width: 8),
         ],
+
       ),
       body: SafeArea(
         child: Column(

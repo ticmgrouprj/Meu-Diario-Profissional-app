@@ -123,11 +123,20 @@ class _PacienteDetalhesScreenState extends ConsumerState<PacienteDetalhesScreen>
                     context.push('/paciente/${pac.id}/enviar-mensagem');
                   },
                 ),
+                ListTile(
+                  leading: const Icon(Icons.calculate_rounded, color: Color(0xFF10B981)),
+                  title: const Text('Calculadoras Médicas no Bolso'),
+                  subtitle: const Text('Framingham, CHA₂DS₂-VASc, CKD-EPI, IMC'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/paciente/${pac.id}/calculadoras');
+                  },
+                ),
               ],
             ),
-
           ),
         );
+
       },
     );
   }
