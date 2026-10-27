@@ -13,6 +13,7 @@ import '../../presentation/tools/vincular_paciente_screen.dart';
 import '../../presentation/tools/teleconsulta_screen.dart';
 import '../../presentation/tools/calculadoras_screen.dart';
 import '../../presentation/clinical_actions/enviar_mensagem_paciente_screen.dart';
+import '../../presentation/paciente/ajustar_metas_screen.dart';
 
 
 
@@ -98,6 +99,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) {
               final id = state.pathParameters['id']!;
               return CalculadorasScreen(pacienteId: id);
+            },
+          ),
+          GoRoute(
+            path: 'metas',
+            builder: (context, state) {
+              final id = state.pathParameters['id']!;
+              return AjustarMetasScreen(pacienteId: id);
             },
           ),
         ],

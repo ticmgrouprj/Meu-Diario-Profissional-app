@@ -46,6 +46,9 @@ class PacientesNotifier extends StateNotifier<List<PacienteResumo>> {
       return matchesQuery && matchesStatus;
     }).toList();
   }
+  void recarregar() {
+    carregar();
+  }
 }
 
 class AlertasNotifier extends StateNotifier<List<AlertaClinico>> {
@@ -82,6 +85,13 @@ class PacientesRepository {
       return _db.pacientes.firstWhere((p) => p.id == id);
     } catch (_) {
       return null;
+    }
+  }
+
+  void atualizarMetas(String pacienteId, MetasClinicas novasMetas) {
+    final idx = _db.pacientes.indexWhere((p) => p.id == pacienteId);
+    if (idx != -1) {
+      _db.pacientes[idx] = _db.pacientes[idx].copyWith(metas: novasMetas);
     }
   }
 

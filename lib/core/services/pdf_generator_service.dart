@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../data/models/paciente_model.dart';
 import '../../data/models/prescricao_model.dart';
 import '../../data/models/documento_model.dart';
+import '../../data/models/vitals_model.dart';
+import '../../data/models/consulta_soap_model.dart';
 
 class PdfGeneratorService {
   static final PdfGeneratorService instance = PdfGeneratorService._internal();
@@ -342,6 +344,362 @@ class PdfGeneratorService {
             ],
           );
         },
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  // ─── 4. GERAR DOSSIÊ CLÍNICO 360° CONSOLIDADO ───
+  Future<Uint8List> gerarDossieClinicoPdf({
+    required Profissional profissional,
+    required Paciente paciente,
+    required List<RegistroPressao> pressoes,
+    required List<RegistroGlicemia> glicemias,
+    required List<ItemPrescricao> medicamentos,
+    ConsultaSOAP? ultimaConsulta,
+    String? observacoesGerais,
+  }) async {
+    final pdf = pw.Document();
+    final dateFormat = DateFormat('dd/MM/yyyy');
+
+    // Estatísticas de telemetria
+    final mediaSis = pressoes.isNotEmpty
+        ? (pressoes.map((m) => m.sistolica).reduce((a, b) => a + b) / pressoes.length).round()
+        : null;
+    final mediaDia = pressoes.isNotEmpty
+        ? (pressoes.map((m) => m.diastolica).reduce((a, b) => a + b) / pressoes.length).round()
+        : null;
+
+    final dentroDaMeta = pressoes.where((m) =>
+        m.sistolica <= paciente.metas.paSistolicaMax &&
+        m.diastolica <= paciente.metas.paDiastolicaMax).length;
+    final tir = pressoes.isNotEmpty ? ((dentroDaMeta / pressoes.length) * 100).round() : 100;
+
+    final mediaGlic = glicemias.isNotEmpty
+        ? (glicemias.map((m) => m.valor).reduce((a, b) => a + b) / glicemias.length).round()
+        : null;
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (context) => [
+          // Cabeçalho Institucional
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'DOSSIÊ CLÍNICO 360° • MEU DIÁRIO DE SAÚDE',
+                    style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.teal800),
+                  ),
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    profissional.nome,
+                    style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey900),
+                  ),
+                  pw.Text(
+                    '${profissional.especialidade} • ${profissional.carimbo}',
+                    style: const pw.TextStyle(fontSize: 10, color: PdfColors.blueGrey700),
+                  ),
+                  if (profissional.enderecoConsultorio != null)
+                    pw.Text(
+                      profissional.enderecoConsultorio!,
+                      style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+                    ),
+                ],
+              ),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  pw.BarcodeWidget(
+                    barcode: pw.Barcode.qrCode(),
+                    data: 'https://meudiariodesaude.com.br/verificar?paciente=${paciente.id}',
+                    width: 48,
+                    height: 48,
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text('Emissão: ${dateFormat.format(DateTime.now())}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                ],
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 8),
+          pw.Divider(thickness: 1.5, color: PdfColors.teal700),
+          pw.SizedBox(height: 10),
+
+          // Bloco do Paciente
+          pw.Container(
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.grey100,
+              borderRadius: pw.BorderRadius.circular(6),
+              border: pw.Border.all(color: PdfColors.grey300),
+            ),
+            child: pw.Row(
+              children: [
+                pw.Expanded(
+                  flex: 3,
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('PACIENTE: ${paciente.nome}', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                      pw.SizedBox(height: 2),
+                      pw.Text(
+                        '${paciente.idade} anos • Sexo: ${paciente.sexo == Sexo.f ? "Feminino" : "Masculino"} • Nasc: ${paciente.dataNascimento}',
+                        style: const pw.TextStyle(fontSize: 9),
+                      ),
+                      if (paciente.telefone != null)
+                        pw.Text('Contato: ${paciente.telefone}', style: const pw.TextStyle(fontSize: 9)),
+                    ],
+                  ),
+                ),
+                pw.Expanded(
+                  flex: 2,
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'Alergias:',
+                        style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: paciente.alergias.isNotEmpty ? PdfColors.red800 : PdfColors.grey700),
+                      ),
+                      pw.Text(
+                        paciente.alergias.isNotEmpty ? paciente.alergias.join(', ') : 'Nenhuma relatada',
+                        style: pw.TextStyle(fontSize: 9, color: paciente.alergias.isNotEmpty ? PdfColors.red900 : PdfColors.black),
+                      ),
+                      pw.SizedBox(height: 2),
+                      pw.Text('Diagnósticos (CID-10):', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                      pw.Text(
+                        paciente.diagnosticos.isNotEmpty
+                            ? paciente.diagnosticos.map((d) => '${d.codigoCid} - ${d.descricao}').join('; ')
+                            : 'Em investigação',
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 14),
+
+          // Seção 1: Resumo Estatístico de Telemetria
+          pw.Text('1. RESUMO DE TELEMETRIA E CONTROLE CLÍNICO (ÚLTIMOS REGISTROS)', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.teal900)),
+          pw.SizedBox(height: 6),
+          pw.Row(
+            children: [
+              pw.Expanded(
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.all(8),
+                  decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.blueGrey200), borderRadius: pw.BorderRadius.circular(4)),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('PA Média', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                      pw.Text(mediaSis != null ? '$mediaSis/$mediaDia mmHg' : '—', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.teal900)),
+                      pw.Text('Meta: ≤ ${paciente.metas.paSistolicaMax.toInt()}/${paciente.metas.paDiastolicaMax.toInt()}', style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
+                    ],
+                  ),
+                ),
+              ),
+              pw.SizedBox(width: 8),
+              pw.Expanded(
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.all(8),
+                  decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.blueGrey200), borderRadius: pw.BorderRadius.circular(4)),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Time in Range (TIR)', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                      pw.Text('$tir% no alvo', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: tir >= 70 ? PdfColors.green800 : PdfColors.amber800)),
+                      pw.Text('Alvo terapêutico: ≥ 70%', style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
+                    ],
+                  ),
+                ),
+              ),
+              pw.SizedBox(width: 8),
+              pw.Expanded(
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.all(8),
+                  decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.blueGrey200), borderRadius: pw.BorderRadius.circular(4)),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Glicemia Média', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                      pw.Text(mediaGlic != null ? '$mediaGlic mg/dL' : '—', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey900)),
+                      pw.Text('Meta: ${paciente.metas.glicemiaJejumMin.toInt()} - ${paciente.metas.glicemiaJejumMax.toInt()} mg/dL', style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
+                    ],
+                  ),
+                ),
+              ),
+              pw.SizedBox(width: 8),
+              pw.Expanded(
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.all(8),
+                  decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.blueGrey200), borderRadius: pw.BorderRadius.circular(4)),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Total de Aferições', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                      pw.Text('${pressoes.length + glicemias.length} regs', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey900)),
+                      pw.Text('Monitoramento Ativo', style: const pw.TextStyle(fontSize: 7, color: PdfColors.green800)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 8),
+
+          // Tabela das últimas 6 medições de PA
+          if (pressoes.isNotEmpty) ...[
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+              columnWidths: {
+                0: const pw.FlexColumnWidth(2.5),
+                1: const pw.FlexColumnWidth(2),
+                2: const pw.FlexColumnWidth(2),
+                3: const pw.FlexColumnWidth(2.5),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                  children: [
+                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Data / Hora', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('PA Sistólica', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('PA Diastólica', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Período / Contexto', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                  ],
+                ),
+                ...pressoes.take(6).map((m) {
+                  final alterada = m.sistolica >= paciente.metas.paSistolicaMax || m.diastolica >= paciente.metas.paDiastolicaMax;
+                  return pw.TableRow(
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('${m.data} ${m.hora}', style: const pw.TextStyle(fontSize: 8))),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text(
+                          '${m.sistolica} mmHg',
+                          style: pw.TextStyle(
+                            fontSize: 8,
+                            fontWeight: alterada ? pw.FontWeight.bold : pw.FontWeight.normal,
+                            color: alterada ? PdfColors.red800 : PdfColors.black,
+                          ),
+                        ),
+                      ),
+                      pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('${m.diastolica} mmHg', style: const pw.TextStyle(fontSize: 8))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(m.periodo ?? 'Rotina', style: const pw.TextStyle(fontSize: 8))),
+                    ],
+                  );
+                }),
+              ],
+            ),
+          ],
+          pw.SizedBox(height: 14),
+
+          // Seção 2: Medicamentos em Uso
+          pw.Text('2. FARMACOTERAPIA ATUAL EM USO', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.teal900)),
+          pw.SizedBox(height: 6),
+          if (medicamentos.isEmpty)
+            pw.Text('Nenhum medicamento registrado no prontuário.', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700))
+          else
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+              columnWidths: {
+                0: const pw.FlexColumnWidth(3),
+                1: const pw.FlexColumnWidth(2),
+                2: const pw.FlexColumnWidth(4),
+                3: const pw.FlexColumnWidth(2),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                  children: [
+                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Medicamento', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Concentração / Forma', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Posologia Recomendada', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('Regime', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                  ],
+                ),
+                ...medicamentos.map((it) {
+                  return pw.TableRow(
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(it.medicamento, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('${it.concentracao} (${it.forma})', style: const pw.TextStyle(fontSize: 8))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(it.posologia, style: const pw.TextStyle(fontSize: 8))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(it.duracao == 'continuo' ? 'Uso Contínuo' : it.duracao, style: const pw.TextStyle(fontSize: 8))),
+                    ],
+                  );
+                }),
+              ],
+            ),
+          pw.SizedBox(height: 14),
+
+          // Seção 3: Última Evolução Clínica (SOAP)
+          if (ultimaConsulta != null) ...[
+            pw.Text('3. ÚLTIMA EVOLUÇÃO CLÍNICA REGISTRADA (SOAP)', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.teal900)),
+            pw.SizedBox(height: 4),
+            pw.Container(
+              padding: const pw.EdgeInsets.all(8),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.grey300),
+                borderRadius: pw.BorderRadius.circular(4),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Data da Consulta: ${dateFormat.format(ultimaConsulta.data)}', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
+                  pw.SizedBox(height: 4),
+                  pw.RichText(
+                    text: pw.TextSpan(
+                      children: [
+                        pw.TextSpan(text: 'S (Subjetivo): ', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                        pw.TextSpan(text: '${ultimaConsulta.subjetivo}\n', style: const pw.TextStyle(fontSize: 8)),
+                        pw.TextSpan(text: 'O (Objetivo): ', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                        pw.TextSpan(text: '${ultimaConsulta.objetivo}\n', style: const pw.TextStyle(fontSize: 8)),
+                        pw.TextSpan(text: 'A (Avaliação): ', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                        pw.TextSpan(text: '${ultimaConsulta.avaliacao}\n', style: const pw.TextStyle(fontSize: 8)),
+                        pw.TextSpan(text: 'P (Plano / Conduta): ', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.teal900)),
+                        pw.TextSpan(text: ultimaConsulta.plano, style: const pw.TextStyle(fontSize: 8)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 14),
+          ],
+
+          // Assinatura e Carimbo
+          pw.SizedBox(height: 20),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.end,
+            children: [
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Documento emitido pelo prontuário eletrônico do profissional.', style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
+                  pw.Text('Conforme Resoluções CFM nº 1.821/2007 e 2.299/2021 sobre documentos médicos eletrônicos.', style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
+                ],
+              ),
+              pw.Container(
+                width: 200,
+                child: pw.Column(
+                  children: [
+                    pw.Divider(thickness: 1, color: PdfColors.black),
+                    pw.Text(profissional.nome, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                    pw.Text(profissional.carimbo, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
 

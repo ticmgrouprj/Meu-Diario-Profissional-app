@@ -10,6 +10,17 @@ import '../../data/models/paciente_model.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/pacientes_repository.dart';
 
+enum OrdemTriagem {
+  gravidade('🚨 Gravidade (Críticos)', Icons.warning_amber_rounded),
+  recente('⏱️ Mais Recente', Icons.access_time_rounded),
+  adesao('📉 Menor Adesão', Icons.trending_down_rounded),
+  alfabetica('🔤 Nome (A-Z)', Icons.sort_by_alpha_rounded);
+
+  final String label;
+  final IconData icon;
+  const OrdemTriagem(this.label, this.icon);
+}
+
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
@@ -20,6 +31,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   final _searchController = TextEditingController();
   StatusRisco? _filtroStatus;
+  OrdemTriagem _ordem = OrdemTriagem.gravidade;
 
   @override
   void dispose() {
@@ -46,6 +58,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final countCritico = todos.where((p) => p.status == StatusRisco.critico).length;
     final countAtencao = todos.where((p) => p.status == StatusRisco.atencao).length;
     final countEstavel = todos.where((p) => p.status == StatusRisco.estavel).length;
+
+    // Aplicar ordenação de triagem clínica
+    final listaOrdenada = List<PacienteResumo>.from(pacientesResumo);
+    switch (_ordem) {
+      case OrdemTriagem.gravidade:
+        listaOrdenada.sort((a, b) {
+          final pesoA = a.status == StatusRisco.critico ? 0 : (a.status == StatusRisco.atencao ? 1 : 2);
+          final pesoB = b.status == StatusRisco.critico ? 0 : (b.status == StatusRisco.atencao ? 1 : 2);
+          return pesoA.compareTo(pesoB);
+        });
+        break;
+      case OrdemTriagem.recente:
+        listaOrdenada.sort((a, b) {
+          final dtA = a.ultimaAfericao?.em ?? DateTime(2000);
+          final dtB = b.ultimaAfericao?.em ?? DateTime(2000);
+          return dtB.compareTo(dtA);
+        });
+        break;
+      case OrdemTriagem.adesao:
+        listaOrdenada.sort((a, b) {
+          final adA = a.adesao7d ?? 1.0;
+          final adB = b.adesao7d ?? 1.0;
+          return adA.compareTo(adB);
+        });
+        break;
+      case OrdemTriagem.alfabetica:
+        listaOrdenada.sort((a, b) => a.paciente.nome.compareTo(b.paciente.nome));
+        break;
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -76,30 +117,64 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
           const SizedBox(width: 8),
         ],
-
       ),
       body: SafeArea(
         child: Column(
           children: [
-            // Barra de Busca
+            // Barra de Busca com botão de ordenação
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: TextField(
-                controller: _searchController,
-                onChanged: _onSearchChanged,
-                decoration: InputDecoration(
-                  hintText: 'Buscar paciente ou CID-10...',
-                  prefixIcon: const Icon(Icons.search_rounded, color: AppColors.slateTextMuted),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
-                          onPressed: () {
-                            _searchController.clear();
-                            _onSearchChanged('');
-                          },
-                        )
-                      : null,
-                ),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: _onSearchChanged,
+                      decoration: InputDecoration(
+                        hintText: 'Buscar paciente ou CID-10...',
+                        prefixIcon: const Icon(Icons.search_rounded, color: AppColors.slateTextMuted),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  _onSearchChanged('');
+                                },
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  PopupMenuButton<OrdemTriagem>(
+                    initialValue: _ordem,
+                    tooltip: 'Critério de Triagem',
+                    onSelected: (novaOrdem) {
+                      setState(() => _ordem = novaOrdem);
+                    },
+                    itemBuilder: (context) => OrdemTriagem.values.map((o) {
+                      return PopupMenuItem(
+                        value: o,
+                        child: Row(
+                          children: [
+                            Icon(o.icon, size: 18, color: _ordem == o ? AppColors.primary : AppColors.slateTextMuted),
+                            const SizedBox(width: 10),
+                            Text(o.label, style: AppTypography.bodyMedium),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.slateBorder),
+                      ),
+                      child: const Icon(Icons.swap_vert_rounded, color: AppColors.primary),
+                    ),
+                  ),
+                ],
               ),
             ),
 
@@ -141,7 +216,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
             // Lista de Pacientes
             Expanded(
-              child: pacientesResumo.isEmpty
+              child: listaOrdenada.isEmpty
                   ? EmptyState(
                       icon: Icons.search_off_rounded,
                       title: 'Nenhum paciente encontrado',
@@ -154,10 +229,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     )
                   : ListView.separated(
                       padding: const EdgeInsets.all(16),
-                      itemCount: pacientesResumo.length,
+                      itemCount: listaOrdenada.length,
                       separatorBuilder: (context, index) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
-                        final item = pacientesResumo[index];
+                        final item = listaOrdenada[index];
                         final pac = item.paciente;
 
                         return ClinicalCard(
@@ -205,6 +280,54 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 ],
                               ),
                               const SizedBox(height: 12),
+
+                              // Motivo do Status Clínico (Se houver alerta/desvio)
+                              if (item.motivoStatus != null && item.motivoStatus!.isNotEmpty) ...[
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: item.status == StatusRisco.critico
+                                        ? AppColors.riskCriticoBg
+                                        : (item.status == StatusRisco.atencao ? AppColors.riskAtencaoBg : AppColors.riskEstavelBg),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: item.status == StatusRisco.critico
+                                          ? AppColors.riskCritico.withValues(alpha: 0.3)
+                                          : (item.status == StatusRisco.atencao ? AppColors.riskAtencao.withValues(alpha: 0.3) : AppColors.riskEstavel.withValues(alpha: 0.3)),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        item.status == StatusRisco.critico
+                                            ? Icons.warning_amber_rounded
+                                            : Icons.info_outline_rounded,
+                                        size: 15,
+                                        color: item.status == StatusRisco.critico
+                                            ? AppColors.riskCriticoText
+                                            : (item.status == StatusRisco.atencao ? AppColors.riskAtencaoText : AppColors.riskEstavelText),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          item.motivoStatus!,
+                                          style: AppTypography.bodySmall.copyWith(
+                                            color: item.status == StatusRisco.critico
+                                                ? AppColors.riskCriticoText
+                                                : (item.status == StatusRisco.atencao ? AppColors.riskAtencaoText : AppColors.riskEstavelText),
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 11,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                              ],
 
                               // Diagnósticos
                               if (pac.diagnosticos.isNotEmpty) ...[

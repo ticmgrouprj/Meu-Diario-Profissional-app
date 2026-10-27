@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/theme/theme_provider.dart';
 import '../../core/widgets/clinical_card.dart';
 import '../../core/widgets/custom_button.dart';
 import '../../core/services/notification_service.dart';
@@ -14,6 +16,7 @@ class PerfilScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profissional = ref.watch(currentProfissionalProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -55,6 +58,56 @@ class PerfilScreen extends ConsumerWidget {
                     child: Text(
                       profissional?.carimbo ?? 'CRM-RJ 123456',
                       style: AppTypography.titleSmall.copyWith(letterSpacing: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Aparência & Modo Noturno
+            ClinicalCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.dark_mode_outlined, color: AppColors.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Aparência e Modo Noturno', style: AppTypography.titleSmall),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'O tema escuro de alto contraste reduz a fadiga visual durante plantões e atendimentos noturnos.',
+                    style: AppTypography.bodySmall,
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<ThemeMode>(
+                      segments: const [
+                        ButtonSegment(
+                          value: ThemeMode.light,
+                          label: Text('Claro'),
+                          icon: Icon(Icons.light_mode_rounded, size: 16),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.dark,
+                          label: Text('Noturno'),
+                          icon: Icon(Icons.dark_mode_rounded, size: 16),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.system,
+                          label: Text('Auto'),
+                          icon: Icon(Icons.brightness_auto_rounded, size: 16),
+                        ),
+                      ],
+                      selected: {themeMode},
+                      onSelectionChanged: (newSelection) {
+                        HapticFeedback.selectionClick();
+                        ref.read(themeModeProvider.notifier).state = newSelection.first;
+                      },
                     ),
                   ),
                 ],

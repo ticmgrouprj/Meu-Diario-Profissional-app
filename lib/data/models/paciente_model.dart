@@ -56,6 +56,22 @@ class MetasClinicas {
     glicemiaPosPrandialMax: (json['glicemiaPosPrandialMax'] as num?)?.toDouble() ?? 140,
     pesoMeta: (json['pesoMeta'] as num?)?.toDouble(),
   );
+
+  MetasClinicas copyWith({
+    double? paSistolicaMax,
+    double? paDiastolicaMax,
+    double? glicemiaJejumMin,
+    double? glicemiaJejumMax,
+    double? glicemiaPosPrandialMax,
+    double? pesoMeta,
+  }) => MetasClinicas(
+    paSistolicaMax: paSistolicaMax ?? this.paSistolicaMax,
+    paDiastolicaMax: paDiastolicaMax ?? this.paDiastolicaMax,
+    glicemiaJejumMin: glicemiaJejumMin ?? this.glicemiaJejumMin,
+    glicemiaJejumMax: glicemiaJejumMax ?? this.glicemiaJejumMax,
+    glicemiaPosPrandialMax: glicemiaPosPrandialMax ?? this.glicemiaPosPrandialMax,
+    pesoMeta: pesoMeta ?? this.pesoMeta,
+  );
 }
 
 class Paciente {
@@ -86,6 +102,34 @@ class Paciente {
     required this.vinculadoEm,
     this.proximoRetorno,
   });
+
+  Paciente copyWith({
+    String? id,
+    String? nome,
+    Sexo? sexo,
+    String? dataNascimento,
+    String? telefone,
+    String? email,
+    double? altura,
+    List<String>? alergias,
+    List<Diagnostico>? diagnosticos,
+    MetasClinicas? metas,
+    DateTime? vinculadoEm,
+    DateTime? proximoRetorno,
+  }) => Paciente(
+    id: id ?? this.id,
+    nome: nome ?? this.nome,
+    sexo: sexo ?? this.sexo,
+    dataNascimento: dataNascimento ?? this.dataNascimento,
+    telefone: telefone ?? this.telefone,
+    email: email ?? this.email,
+    altura: altura ?? this.altura,
+    alergias: alergias ?? this.alergias,
+    diagnosticos: diagnosticos ?? this.diagnosticos,
+    metas: metas ?? this.metas,
+    vinculadoEm: vinculadoEm ?? this.vinculadoEm,
+    proximoRetorno: proximoRetorno ?? this.proximoRetorno,
+  );
 
   int get idade {
     try {

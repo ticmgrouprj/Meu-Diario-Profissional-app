@@ -132,6 +132,15 @@ class _PacienteDetalhesScreenState extends ConsumerState<PacienteDetalhesScreen>
                     context.push('/paciente/${pac.id}/calculadoras');
                   },
                 ),
+                ListTile(
+                  leading: const Icon(Icons.track_changes_rounded, color: Color(0xFF0284C7)),
+                  title: const Text('Metas Clínicas Personalizadas'),
+                  subtitle: const Text('Ajustar PA e glicemia alvo individuais'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/paciente/${pac.id}/metas');
+                  },
+                ),
               ],
             ),
           ),
@@ -174,6 +183,11 @@ class _PacienteDetalhesScreenState extends ConsumerState<PacienteDetalhesScreen>
       appBar: AppBar(
         title: Text(paciente.nome),
         actions: [
+          IconButton(
+            tooltip: 'Metas Clínicas',
+            icon: const Icon(Icons.track_changes_rounded, color: AppColors.primary),
+            onPressed: () => context.push('/paciente/${paciente.id}/metas'),
+          ),
           IconButton(
             tooltip: 'Ações Clínicas',
             icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary, size: 26),
