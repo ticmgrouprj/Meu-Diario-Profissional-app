@@ -221,10 +221,13 @@ meu-diario-profissional-mobile/
    ```bash
    flutter run
    ```
-2. **Checklist clínico:**
-   - [ ] Autenticação com biometria (Face ID ou digital).
-   - [ ] Triagem de pacientes com ordenação por gravidade.
-   - [ ] Toque nos gráficos de PA e Glicemia verificando os tooltips com data e valor.
-   - [ ] Geração de uma Prescrição Digital e verificação da abertura do menu nativo de compartilhamento (WhatsApp / Salvar em Arquivo).
-   - [ ] Abertura da câmera no scanner de QR Code de vinculação.
-   - [ ] Simulação de alerta crítico no perfil e conferência da notificação recebida no smartphone.
+2. **Checklist clínico concluído e verificado:**
+   - [x] Autenticação com biometria (Face ID ou digital).
+   - [x] Triagem de pacientes com ordenação por gravidade, recência e adesão.
+   - [x] Toque nos gráficos de PA e Glicemia verificando tooltips, médias e Time in Range (TIR %).
+   - [x] Geração de Prescrição Digital, Atestado CFM e Dossiê 360° com compartilhamento nativo (WhatsApp / PDF).
+   - [x] Abertura de câmera e scanner de QR Code de vinculação rápida.
+   - [x] Simulação de alerta crítico no perfil e notificação local com vibração háptica.
+   - [x] Calculadoras Médicas de Bolso (Framingham, CHA₂DS₂-VASc, CKD-EPI 2021, IMC).
+   - [x] Ajuste de Metas Clínicas personalizadas por paciente com presets SBC/ADA.
+   - [x] Modo Noturno Clínico (Dark Mode de Alto Contraste).
